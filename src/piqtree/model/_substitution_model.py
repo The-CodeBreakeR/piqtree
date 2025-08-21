@@ -22,37 +22,49 @@ class SubstitutionModel:
         raise NotImplementedError
 
     def iqtree_str(self) -> str:
-        """The IQ-TREE representation of the model.
-
+        """Get the IQ-TREE representation of the model.
 
         Returns
         -------
         str
             The IQ-TREE representation of the model.
+
+        """
+        raise NotImplementedError
+
+    @property
+    def base_model(self) -> "SubstitutionModel":
+        """Get the base model enum used by the model.
+
+        Returns
+        -------
+        SubstitutionModel
+            The enum of the model.
+
         """
         raise NotImplementedError
 
     @staticmethod
     def iter_available_models() -> Sequence["SubstitutionModel"]:
-        """The available models for the model type.
-
+        """Get the available models for the model type.
 
         Returns
         -------
         Iterable["SubstitutionModel"]:
             The available models.
+
         """
         raise NotImplementedError
 
     @staticmethod
     def num_available_models() -> int:
-        """The number of available models for the model type.
-
+        """Get the number of available models for the model type.
 
         Returns
         -------
         int:
             The number of available models.
+
         """
         raise NotImplementedError
 
@@ -67,6 +79,38 @@ class SubstitutionModel:
 
         """
         raise NotImplementedError
+
+
+@dataclass(frozen=True)
+class StandardDnaModelInstance(SubstitutionModel):
+    dna_model: "StandardDnaModel"
+    model_params: Sequence[float] | None = None
+
+    @staticmethod
+    def model_type() -> str:
+        return "nucleotide"
+
+    def iqtree_str(self) -> str:
+        params = (
+            f"{{{','.join(map(str, self.model_params))}}}" if self.model_params else ""
+        )
+        return f"{self.dna_model.value}{params}"
+
+    @property
+    def base_model(self) -> "StandardDnaModel":
+        return self.dna_model
+
+    @staticmethod
+    def iter_available_models() -> Sequence["StandardDnaModel"]:
+        return StandardDnaModel.iter_available_models()
+
+    @staticmethod
+    def num_available_models() -> int:
+        return StandardDnaModel.num_available_models()
+
+    @property
+    def description(self) -> str:
+        return StandardDnaModel._descriptions()[self.dna_model]  # noqa: SLF001
 
 
 @unique
@@ -103,12 +147,37 @@ class StandardDnaModel(SubstitutionModel, Enum):
     STRSYM = "STRSYM"
     UNREST = "UNREST"
 
+    def __call__(
+        self,
+        model_params: Sequence[float] | None = None,
+    ) -> StandardDnaModelInstance:
+        """Parameterise the model.
+
+        If parameters are not supplied, the model is not parameterised.
+
+        Parameters
+        ----------
+        model_params : Sequence[float] | None, optional
+            The relative substitution rates, by default None
+
+        Returns
+        -------
+        StandardDnaModelInstance
+            The parameterised model.
+
+        """
+        return StandardDnaModelInstance(self, model_params)
+
     @staticmethod
     def model_type() -> str:
         return "nucleotide"
 
     def iqtree_str(self) -> str:
         return self.value
+
+    @property
+    def base_model(self) -> "StandardDnaModel":
+        return self
 
     @staticmethod
     def iter_available_models() -> Sequence["StandardDnaModel"]:
@@ -165,6 +234,7 @@ lie_model_pairing = Literal["RY", "WS", "MK"]
 class LieModelInstance(SubstitutionModel):
     lie_model: "LieModel"
     pairing: lie_model_pairing | None = None
+    model_params: Sequence[float] | None = None
 
     valid_pairings: ClassVar[
         tuple[lie_model_pairing, lie_model_pairing, lie_model_pairing]
@@ -189,9 +259,15 @@ class LieModelInstance(SubstitutionModel):
         return "nucleotide"
 
     def iqtree_str(self) -> str:
-        if self.pairing:
-            return f"{self.pairing}{self.lie_model.value}"
-        return self.lie_model.value
+        prefix = self.pairing if self.pairing else ""
+        params = (
+            f"{{{','.join(map(str, self.model_params))}}}" if self.model_params else ""
+        )
+        return f"{prefix}{self.lie_model.value}{params}"
+
+    @property
+    def base_model(self) -> "LieModel":
+        return self.lie_model
 
     @staticmethod
     def iter_available_models() -> Sequence["LieModelInstance"]:
@@ -252,8 +328,34 @@ class LieModel(SubstitutionModel, Enum):
     LIE_10_34 = "10.34"
     LIE_12_12 = "12.12"
 
-    def __call__(self, pairing: lie_model_pairing | None = None) -> LieModelInstance:
-        return LieModelInstance(self, pairing)
+    def __call__(
+        self,
+        pairing: lie_model_pairing | None = None,
+        model_params: Sequence[float] | None = None,
+    ) -> LieModelInstance:
+        """Parameterise the model.
+
+        If parameters are not supplied, the model is not parameterised.
+
+        Parameters
+        ----------
+        pairing : Literal["RY", "WS", "MK"] | None, optional
+            The pairing type.
+            RY: purine-pyrimidine pairing
+            WS: weak-strong pairing
+            MK: aMino-Keto pairing
+            by default None (unparameterised uses RY).
+        model_params : Sequence[float] | None, optional
+            The weights of the basis matrices, the weights should be
+            bounded between -0.98 and 0.98 exclusive, by default None.
+
+        Returns
+        -------
+        LieModelInstance
+            The parameterised Lie Markov Model.
+
+        """
+        return LieModelInstance(self, pairing, model_params)
 
     @staticmethod
     def model_type() -> str:
@@ -261,6 +363,10 @@ class LieModel(SubstitutionModel, Enum):
 
     def iqtree_str(self) -> str:
         return self.value
+
+    @property
+    def base_model(self) -> "LieModel":
+        return self
 
     @staticmethod
     def iter_available_models() -> Sequence[LieModelInstance]:
@@ -368,6 +474,10 @@ class AaModel(SubstitutionModel, Enum):
     def iqtree_str(self) -> str:
         return self.value
 
+    @property
+    def base_model(self) -> "AaModel":
+        return self
+
     @staticmethod
     def iter_available_models() -> Sequence["AaModel"]:
         return list(AaModel)
@@ -449,27 +559,40 @@ def get_substitution_model(name: str | SubstitutionModel) -> SubstitutionModel:
     if isinstance(name, SubstitutionModel):
         return name
 
-    enum_name = name.replace(".", "_")
-    if len(enum_name) == 0:
+    norm_name = _normalise_prefix(name)
+
+    if len(norm_name) == 0:
         msg = f"Unknown substitution model: {name!r}"
         raise ValueError(msg)
 
+    # No parameterisation of AaModels
     with contextlib.suppress(KeyError):
-        return StandardDnaModel[enum_name]
+        return AaModel[norm_name]
+
+    model_params = _get_model_parameters(norm_name)
+
+    if model_params is not None:
+        norm_name = norm_name[: norm_name.find("{")]
 
     with contextlib.suppress(KeyError):
-        return AaModel[enum_name]
+        return StandardDnaModel[norm_name](model_params)
 
     # Lie models
-    prefix = _get_lie_prefix(enum_name)
+    prefix = _get_lie_prefix(norm_name)
     if prefix is not None:
-        enum_name = enum_name[2:]
+        norm_name = norm_name[2:]
 
     with contextlib.suppress(KeyError):
-        return LieModel["LIE_" + enum_name](prefix)
+        return LieModel["LIE_" + norm_name](prefix, model_params)
 
     msg = f"Unknown substitution model: {name!r}"
     raise ValueError(msg)
+
+
+def _normalise_prefix(name: str) -> str:
+    parts = name.split("{")
+    parts[0] = parts[0].replace(".", "_")
+    return "{".join(parts)
 
 
 def _get_lie_prefix(name: str) -> lie_model_pairing | None:
@@ -477,3 +600,18 @@ def _get_lie_prefix(name: str) -> lie_model_pairing | None:
     if potential_prefix in LieModelInstance.valid_pairings:
         return cast("lie_model_pairing", potential_prefix)
     return None
+
+
+def _get_model_parameters(name: str) -> tuple[float, ...] | None:
+    params_start = name.find("{")
+    if params_start == -1:  # No params
+        return None
+
+    # The model is parameterised here
+    if name[-1] != "}":
+        msg = f"Missing closing bracket for parameterisation of {name!r}"
+        raise ValueError(msg)
+
+    return tuple(
+        float(param.strip()) for param in name[params_start + 1 : -1].split(",")
+    )

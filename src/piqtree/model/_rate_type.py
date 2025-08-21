@@ -1,4 +1,6 @@
+import itertools
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 
 
 class RateModel(ABC):
@@ -20,20 +22,30 @@ class RateType:
     def __init__(
         self,
         *,
-        invariant_sites: bool = False,
+        invariable_sites: bool | float = False,
         rate_model: RateModel | None = None,
     ) -> None:
         """Rate heterogeneity across sites model.
 
         Parameters
         ----------
-        invariant_sites : bool, optional
-            Invariable Sites Model, by default False.
+        invariable_sites : bool | float, optional
+            Invariable sites, by default False.
+            If a float in the range [0,1), specifies the proportion of invariable sites.
         rate_model : RateModel | None, optional
             Discrete Gamma Model or FreeRate Model, by default None.
 
         """
-        self.invariant_sites = invariant_sites
+        if not isinstance(invariable_sites, bool):
+            if not (0 <= invariable_sites < 1):
+                msg = "The proportion of invaraint sites must be in the range [0,1)"
+                raise ValueError(msg)
+            self.invariable_sites = True
+            self.proportion_invariable: float | None = invariable_sites
+        else:
+            self.invariable_sites = invariable_sites
+            self.proportion_invariable = None
+
         self.rate_model = rate_model
 
     def iqtree_str(self) -> str:
@@ -45,11 +57,14 @@ class RateType:
             String parsable by IQ-TREE for the rate heterogeneity model.
 
         """
-        rate_type_str = "I" if self.invariant_sites else ""
+        rate_type_str = "I" if self.invariable_sites else ""
+        if self.proportion_invariable is not None:
+            rate_type_str += f"{{{self.proportion_invariable}}}"
+
         if self.rate_model is None:
             return rate_type_str
         # Invariant sites and model need to be joined by a '+'
-        if self.invariant_sites:
+        if self.invariable_sites:
             rate_type_str += "+"
         return rate_type_str + self.rate_model.iqtree_str()
 
@@ -59,13 +74,19 @@ class RateType:
 
 
 class DiscreteGammaModel(RateModel):
-    def __init__(self, rate_categories: int | None = None) -> None:
+    def __init__(
+        self,
+        rate_categories: int | None = None,
+        alpha: float | None = None,
+    ) -> None:
         """Discrete Gamma Model.
 
         Parameters
         ----------
         rate_categories : int, optional
             The number of rate categories, by default 4.
+        alpha : float | None, optional
+            The Gamma shape parameter - fixed if not None, by default None
 
         References
         ----------
@@ -75,21 +96,70 @@ class DiscreteGammaModel(RateModel):
 
         """
         self.rate_categories = rate_categories
+        self.alpha = alpha
 
     def iqtree_str(self) -> str:
-        if self.rate_categories is None:
-            return "G"
-        return f"G{self.rate_categories}"
+        out_str = "G"
+
+        if self.rate_categories is not None:
+            out_str += str(self.rate_categories)
+
+        if self.alpha is not None:
+            out_str += f"{{{self.alpha}}}"
+        return out_str
+
+    @classmethod
+    def from_str(cls, rate_model_str: str) -> "DiscreteGammaModel":
+        if len(rate_model_str) == 0:
+            msg = "An empty string is not a DiscreteGammaModel."
+            raise ValueError(msg)
+
+        if rate_model_str[0] != "G":
+            msg = f"A DiscreteGammaModel must start with G but got {rate_model_str!r}."
+            raise ValueError(msg)
+
+        if len(rate_model_str) == 1:
+            return cls()
+
+        rate_categories = _parse_rate_categories(rate_model_str)
+        parameter_start = rate_model_str.find("{")
+
+        # If there is no parameterisation
+        if parameter_start == -1:
+            return cls(rate_categories=rate_categories)
+
+        if not rate_model_str.endswith("}"):
+            msg = f"Missing end bracket for parameterisation {rate_model_str!r}"
+            raise ValueError(msg)
+
+        try:
+            alpha = float(rate_model_str[parameter_start + 1 : -1])
+        except ValueError:
+            msg = f"Parameterisation of Discrete Gamma Model is not a number {rate_model_str!r}"
+            raise ValueError(msg) from None
+
+        return cls(rate_categories=rate_categories, alpha=alpha)
 
 
 class FreeRateModel(RateModel):
-    def __init__(self, rate_categories: int | None = None) -> None:
+    default_rate_categories = 4
+
+    def __init__(
+        self,
+        rate_categories: int | None = None,
+        weights: Sequence[float] | None = None,
+        rates: Sequence[float] | None = None,
+    ) -> None:
         """FreeRate Model.
 
         Parameters
         ----------
         rate_categories : int, optional
             The number of rate categories, by default 4.
+        weights : Sequence[float] | None, optional
+            The weights for each rate category, by default None
+        rates : Sequence[float] | None, optional
+            The rates for each rate category, by default None
 
         References
         ----------
@@ -102,38 +172,114 @@ class FreeRateModel(RateModel):
         """
         self.rate_categories = rate_categories
 
+        if (weights is None) ^ (rates is None):
+            msg = "Must specify both rates and weights or neither."
+            raise ValueError(msg)
+
+        check_rate_categories = (
+            rate_categories
+            if rate_categories is not None
+            else FreeRateModel.default_rate_categories
+        )
+
+        if weights is None or rates is None:
+            self.weights = None
+            self.rates = None
+        else:
+            if (
+                len(weights) != check_rate_categories
+                or len(rates) != check_rate_categories
+            ):
+                msg = f"Expected {check_rate_categories} rates and weights but got {len(weights)} and {len(rates)} respectively."
+                raise ValueError(msg)
+
+            self.weights = list(weights)
+            self.rates = list(rates)
+
     def iqtree_str(self) -> str:
-        if self.rate_categories is None:
-            return "R"
-        return f"R{self.rate_categories}"
+        base = "R" if self.rate_categories is None else f"R{self.rate_categories}"
+
+        if self.weights is None or self.rates is None:
+            return base
+
+        weights_and_rates = itertools.chain.from_iterable(
+            zip(self.weights, self.rates, strict=True),
+        )
+
+        return f"{base}{{{','.join(str(val) for val in weights_and_rates)}}}"
+
+    @classmethod
+    def from_str(cls, rate_model_str: str) -> "FreeRateModel":
+        if len(rate_model_str) == 0:
+            msg = "An empty string is not a FreeRateModel."
+            raise ValueError(msg)
+
+        if rate_model_str[0] != "R":
+            msg = f"A FreeRateModel must start with R but got {rate_model_str!r}."
+            raise ValueError(msg)
+
+        if len(rate_model_str) == 1:
+            return cls()
+
+        rate_categories = _parse_rate_categories(rate_model_str)
+        parameter_start = rate_model_str.find("{")
+
+        # If there is no parameterisation
+        if parameter_start == -1:
+            return cls(rate_categories=rate_categories)
+
+        if not rate_model_str.endswith("}"):
+            msg = f"Missing end bracket for parameterisation {rate_model_str!r}"
+            raise ValueError(msg)
+
+        try:
+            weights_and_rates = [
+                float(part.strip())
+                for part in rate_model_str[parameter_start + 1 : -1].split(",")
+            ]
+        except ValueError:
+            msg = f"Unable to parse parameters for FreeRateModel: {rate_model_str!r}."
+            raise ValueError(msg) from None
+
+        expected_params = 2 * (
+            cls.default_rate_categories if rate_categories is None else rate_categories
+        )
+        if len(weights_and_rates) != expected_params:
+            msg = f"Expected {expected_params} parameters but got {len(weights_and_rates)}."
+            raise ValueError(msg)
+
+        weights = weights_and_rates[::2]
+        rates = weights_and_rates[1::2]
+
+        return cls(rate_categories=rate_categories, weights=weights, rates=rates)
 
 
 ALL_BASE_RATE_TYPES = [
     RateType(),
-    RateType(invariant_sites=True),
+    RateType(invariable_sites=True),
     RateType(rate_model=DiscreteGammaModel()),
-    RateType(invariant_sites=True, rate_model=DiscreteGammaModel()),
+    RateType(invariable_sites=True, rate_model=DiscreteGammaModel()),
     RateType(rate_model=FreeRateModel()),
-    RateType(invariant_sites=True, rate_model=FreeRateModel()),
+    RateType(invariable_sites=True, rate_model=FreeRateModel()),
 ]
 
 _BASE_RATE_TYPE_DESCRIPTIONS = {
     RateType().iqtree_str(): "no invariable sites, no rate heterogeneity model.",
     RateType(
-        invariant_sites=True,
+        invariable_sites=True,
     ).iqtree_str(): "allowing for a proportion of invariable sites.",
     RateType(
         rate_model=DiscreteGammaModel(),
     ).iqtree_str(): "discrete Gamma model (Yang, 1994) with default 4 rate categories. The number of categories can be changed with e.g. +G8.",
     RateType(
-        invariant_sites=True,
+        invariable_sites=True,
         rate_model=DiscreteGammaModel(),
     ).iqtree_str(): "invariable site plus discrete Gamma model (Gu et al., 1995).",
     RateType(
         rate_model=FreeRateModel(),
     ).iqtree_str(): "FreeRate model (Yang, 1995; Soubrier et al., 2012) that generalizes the +G model by relaxing the assumption of Gamma-distributed rates. The number of categories can be specified with e.g. +R6 (default 4 categories if not specified). The FreeRate model typically fits data better than the +G model and is recommended for analysis of large data sets.",
     RateType(
-        invariant_sites=True,
+        invariable_sites=True,
         rate_model=FreeRateModel(),
     ).iqtree_str(): "invariable site plus FreeRate model.",
 }
@@ -147,55 +293,66 @@ def get_description(rate_type: RateType) -> str:
 def get_rate_type(
     rate_model: str | RateModel | None = None,
     *,
-    invariant_sites: bool = False,
+    invariable_sites: bool | float = False,
 ) -> RateType:
-    """Make a RateType from a chosen rate model and invariant sites.
+    """Make a RateType from a chosen rate model and invariable sites.
 
     Parameters
     ----------
     rate_model : str | RateModel | None, optional
         The chosen rate model, by default None.
-    invariant_sites : bool, optional
-        Whether to use invariant sites, by default False.
+    invariable_sites : bool | float, optional
+        Invariable sites, by default False.
+        If a float in the range [0,1), specifies the proportion of invariable sites.
 
     Returns
     -------
     RateType
-        RateType generated from the rate model with invariant sites.
+        RateType generated from the rate model with invariable sites.
 
     """
     if isinstance(rate_model, RateModel):
-        return RateType(rate_model=rate_model, invariant_sites=invariant_sites)
+        return RateType(rate_model=rate_model, invariable_sites=invariable_sites)
 
     if rate_model is None:
-        return RateType(invariant_sites=invariant_sites)
+        return RateType(invariable_sites=invariable_sites)
 
     if not isinstance(rate_model, str):
         msg = f"Unexpected type for rate_model: {type(rate_model)}"
         raise TypeError(msg)
 
     stripped_rate_model = rate_model.lstrip("+")
-    if len(stripped_rate_model) == 1:
-        rate_categories = None
+
+    rate_model_char = stripped_rate_model[0]
+    if rate_model_char == "G":
+        rate_model = DiscreteGammaModel.from_str(stripped_rate_model)
+    elif rate_model_char == "R":
+        rate_model = FreeRateModel.from_str(stripped_rate_model)
     else:
-        integer_part = stripped_rate_model[1:]
-        if not integer_part.isdigit():
-            msg = f"Unexpected value for rate_model {rate_model!r}"
-            raise ValueError(msg)
+        msg = f"Unexpected value for rate_model {rate_model!r}"
+        raise ValueError(msg)
 
-        rate_categories = int(integer_part)
+    return RateType(
+        rate_model=rate_model,
+        invariable_sites=invariable_sites,
+    )
 
-    if stripped_rate_model[0] == "G":
-        return RateType(
-            rate_model=DiscreteGammaModel(rate_categories=rate_categories),
-            invariant_sites=invariant_sites,
-        )
 
-    if stripped_rate_model[0] == "R":
-        return RateType(
-            rate_model=FreeRateModel(rate_categories=rate_categories),
-            invariant_sites=invariant_sites,
-        )
+def _parse_rate_categories(rate_model_str: str) -> int | None:
+    # Assume that the rate model str starts with a G or an R
+    parameters_start = rate_model_str.find("{")
 
-    msg = f"Unexpected value for rate_model {rate_model!r}"
-    raise ValueError(msg)
+    # There is no {} style parameterisation
+    if parameters_start == -1:
+        categories_str = rate_model_str[1:]
+    else:
+        categories_str = rate_model_str[1:parameters_start]
+
+    if len(categories_str) == 0:
+        return None
+
+    try:
+        return int(categories_str)
+    except ValueError:
+        msg = f"Invalid specification for rate categories {rate_model_str!r}"
+        raise ValueError(msg) from None

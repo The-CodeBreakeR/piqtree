@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools >= 61.0", "pybind11 >= 2.12", "delvewheel >= 1.10"]
+requires = ["setuptools>=61.0", "pybind11==3.0.0", "delvewheel==1.11.1"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "piqtree"
-dependencies = ["cogent3>=2025.5.8a9", "pyyaml", "requests"]
+dependencies = ["cogent3>=2025.7.10a8", "pyyaml", "requests"]
 requires-python = ">=3.11, <3.14"
 
 authors = [
@@ -22,7 +22,7 @@ license = "GPL-2.0-only"
 license-files = ["LICENSE"]
 
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 4 - Beta",
 
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
@@ -30,6 +30,7 @@ classifiers = [
 
     "Natural Language :: English",
 
+    "Operating System :: Microsoft :: Windows",
     "Operating System :: MacOS",
     "Operating System :: POSIX :: Linux",
 
@@ -49,17 +50,17 @@ Documentation = "https://piqtree.readthedocs.io"
 
 [project.optional-dependencies]
 dev = [
-    "cibuildwheel",
-    "pybind11",
-    "delvewheel",
+    "cibuildwheel==3.1.3",
+    "pybind11==3.0.0",
+    "delvewheel==1.11.1",
     "scriv",
     "piqtree[test]",
     "piqtree[lint]",
     "piqtree[typing]"
 ]
 test = ["pytest", "pytest-cov", "pytest-markdown-docs", "pytest-mock", "nox"]
-lint = ["ruff==0.12.0"]
-typing = ["mypy==1.16.1", "piqtree[stubs]", "piqtree[test]"]
+lint = ["ruff==0.12.9"]
+typing = ["mypy==1.17.1", "piqtree[stubs]", "piqtree[test]"]
 stubs = ["types-PyYAML", "types-requests"]
 extra = ["cogent3[extra]"]
 doc = [
@@ -70,22 +71,22 @@ doc = [
     "jupytext",
     "piqtree[test]",
     "cogent3[extra]",
-    "diverse-seq",
+    "diverse-seq>=2025.7.10",
     "jupyter",
     "ipywidgets"
 ]
 
 [project.entry-points."cogent3.app"]
-piqtree_phylo = "piqtree._app:piqtree_phylo"
-piqtree_fit = "piqtree._app:piqtree_fit"
-piqtree_random_tree = "piqtree._app:piqtree_random_tree"
-piqtree_jc_dists = "piqtree._app:piqtree_jc_dists"
-piqtree_nj = "piqtree._app:piqtree_nj"
-piqtree_mfinder = "piqtree._app:piqtree_mfinder"
-piqtree_consensus = "piqtree._app:piqtree_consensus"
+piq_build_tree = "piqtree._app:piq_build_tree"
+piq_fit_tree = "piqtree._app:piq_fit_tree"
+piq_random_tree = "piqtree._app:piq_random_tree"
+piq_jc_distances = "piqtree._app:piq_jc_distances"
+piq_nj_tree = "piqtree._app:piq_nj_tree"
+piq_model_finder = "piqtree._app:piq_model_finder"
+piq_consensus_tree = "piqtree._app:piq_consensus_tree"
 
 [project.entry-points."cogent3.hook"]
-quick_tree = "piqtree._app:piqtree_nj"
+quick_tree = "piqtree._app:piq_nj_tree"
 
 [tool.setuptools.dynamic]
 version = { attr = "piqtree.__version__" }
@@ -158,7 +159,7 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
     "FBT001", # allow bool pos args for parameterisation
     "D" # don't require docstring linting
 ]
-"docs/**/*.py" = ["B018", "E402", "ERA001", "INP001"]
+"docs/**/*.py" = ["B018", "E402", "ERA001", "INP001", "D"]
 "src/piqtree/_app/__init__.py" = [
     "N801" # apps follow function naming convention
 ]
@@ -172,8 +173,16 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 ]
 "setup.py" = [
     "S603", # allow subprocess invalidated input for brew install
-    "S607" # allow subprocess with partial path
+    "S607", # allow subprocess with partial path
+    "D" # Don't expect docstrings for setup.py
 ]
+"noxfile.py" = [
+    "D" # Don't expect docstrings for noxfile
+]
+"rtd_get_docs.py" = [
+    "D" # Don't expect docstrings for rtd file.
+]
+
 
 [tool.ruff.format]
 # Like Black, use double quotes for strings.

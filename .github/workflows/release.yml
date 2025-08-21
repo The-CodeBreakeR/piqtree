@@ -30,7 +30,7 @@ jobs:
           platform_id: win_amd64
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
           submodules: recursive
@@ -64,7 +64,7 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
     
       - name: Build Wheels
-        uses: pypa/cibuildwheel@v3.0.0
+        uses: pypa/cibuildwheel@v3.1.3
         env: # Can specify per os - e.g. CIBW_BEFORE_ALL_LINUX, CIBW_BEFORE_ALL_MACOS, CIBW_BEFORE_ALL_WINDOWS 
           CIBW_BEFORE_ALL_LINUX: ./build_tools/before_all_linux.sh
           CIBW_BEFORE_ALL_MACOS: ./build_tools/before_all_mac.sh
@@ -74,10 +74,8 @@ jobs:
           CIBW_ARCHS_MACOS: ${{endsWith(matrix.platform_id, 'universal2') && 'universal2' || 'auto'}} 
           CIBW_ARCHS_WINDOWS: ${{endsWith(matrix.platform_id, '_amd64') && 'AMD64' || 'ARM64'}} 
           CIBW_BUILD: "*${{matrix.platform_id}}"
-          CIBW_TEST_REQUIRES: pytest
+          CIBW_TEST_REQUIRES: pytest pytest-mock
           CIBW_TEST_COMMAND: pytest {package}/tests
-          CIBW_TEST_SKIP: "*-macosx_universal2:x86_64" # skip x86 on m1 mac
-          CIBW_SKIP: pp* # Disable building PyPy wheels on all platforms
 
       - name: Upload Wheels
         uses: actions/upload-artifact@v4
@@ -89,7 +87,7 @@ jobs:
     name: Fetch or Build IQ-TREE Static Library
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
           submodules: recursive
@@ -107,7 +105,7 @@ jobs:
     needs: build-iqtree
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
           submodules: recursive
@@ -142,7 +140,7 @@ jobs:
 
     steps:      
       - name: Download Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           pattern: cibw-*
           path: dist
@@ -163,7 +161,7 @@ jobs:
 
     steps:      
       - name: Download Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           pattern: cibw-*
           path: dist

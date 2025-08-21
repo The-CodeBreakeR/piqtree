@@ -1,10 +1,11 @@
 import os
+import tempfile
 from pathlib import Path
 
 import nox
 
 _py_versions = range(11, 14)
-_python_sessions = [f"3.{v}" + (".5" if v == 13 else "") for v in _py_versions]
+_python_sessions = [f"3.{v}" for v in _py_versions]
 
 
 @nox.session(python=_python_sessions)
@@ -39,18 +40,24 @@ def ruff(session: nox.Session) -> None:
 
 @nox.session(python=_python_sessions)
 def test_docs(session: nox.Session) -> None:
-    md_files = Path("docs").rglob("*.md")
+    doc_md_files = [path.resolve() for path in Path("docs").rglob("*.md")]
+    doc_py_files = [path.resolve() for path in Path("docs").rglob("*.py")]
+
+    doctest_setup_path = Path("docs/scripts/prepare_doc_test_data.py").resolve()
 
     posargs = list(session.posargs)
-    posargs.extend(["--markdown-docs", *md_files])
+    posargs.extend(["--markdown-docs", *doc_md_files])
     env = os.environ.copy()
 
     install_spec = ".[test]"
     session.install(install_spec)
 
-    try:
-        session.run("python", "docs/scripts/prepare_doc_test_data.py", env=env)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        session.chdir(tmpdir)
+
+        session.run("python", doctest_setup_path, env=env)
         session.run("pytest", *posargs, env=env)
-    finally:
-        Path("my_alignment.fasta").unlink(missing_ok=True)
-        Path("protein.fasta").unlink(missing_ok=True)
+
+        session.install("cogent3[extra]", "diverse-seq")
+        for py_file in doc_py_files:
+            session.run("python", py_file, env=env, silent=True)
