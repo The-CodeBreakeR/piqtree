@@ -19,8 +19,8 @@ iq_simulate_alignment = iqtree_func(iq_simulate_alignment, hide_files=True)
 def simulate_alignment(
     trees: list[cogent3.PhyloNode],
     model: Model | str,
-    length: int = 1000,
-    rand_seed: int | None = None,
+    rand_seed: int,
+    length: int | None = 1000,
     insertion_rate: float = 0.0,
     deletion_rate: float = 0.0,
     insertion_size_distribution: IndelDistribution | str = "POW{1.7/100}",
@@ -66,7 +66,8 @@ def simulate_alignment(
     -------
     c3_types.AlignedSeqsType
         The simulated alignment.
-
+    str
+        The console log
     """
     if rand_seed is None:
         rand_seed = 0
@@ -116,5 +117,6 @@ def simulate_alignment(
             new_type=True,
         )  # moltype = 'dna' or 'protein')
     Path(tmp.name).unlink()
+    console_log = yaml_result["log"]
 
-    return aln
+    return aln, console_log
