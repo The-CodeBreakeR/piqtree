@@ -1,21 +1,19 @@
-# Simulate trees and alignments using msprime and AliSim
+# Simulate coalescent trees with msprime and an alignment with AliSim
 
-A set of coalescent trees and their corresponding alignments can be simulated using `sim_ancestry` from `msprime` and `simulate_alignment` from the `piqtree`'s version of `AliSim`.
+A set of coalescent trees can be simulated using `sim_ancestry()` from the [msprime](https://github.com/tskit-dev/msprime). Then, an alignment can be simulated using `simulate_alignment()` from the `piqtree` package.
 
 ## Usage
 
 ### Example for Single Population
 
-The following pipeline simulates a set of trees independently under the coalescent model with a given population size and recombination rate using `msprime`, then rescales the branch lengths of the trees to substitution units, and finally simulates a set of alignments for the rescaled trees using the `piqtree`'s version of `AliSim` with a given substitution model and random seed.
-
-The example below shows the pipeline for generating one pair of tree/alignment for 10 taxa.
+The following pipeline simulates a set of trees independently under the coalescent model with a given population size and recombination rate using `msprime`, then rescales the branch lengths of the trees to substitution units, and finally simulates an alignment for the rescaled trees using the `piqtree`'s version of `AliSim` with a given substitution model and random seed.
 
 ```python
 from piqtree import simulate_alignment
 import cogent3
 import msprime
 
-# Sets simulation parameters
+# Set simulation parameters
 num_taxa = 10
 seq_length = 2000
 recombination_rate = 1e-8
@@ -23,7 +21,7 @@ population_size = 10000
 num_threads = 5
 seed = 1
 
-# Simulates trees under the coalescent model using msprime
+# Simulate trees under the coalescent model using msprime
 ts = msprime.sim_ancestry(
         samples=num_taxa/2,
         sequence_length=seq_length,
@@ -31,30 +29,35 @@ ts = msprime.sim_ancestry(
         population_size=population_size,
         random_seed=seed)
 
+# Take the first tree for simulating an alignment
 for t in ts.trees():
     newick_tree = t.as_newick()
     break
 tree = cogent3.make_tree(newick_tree)
 
-# Rescales branch lengths to substitution units
+# Rescale branch lengths to substitution units
 scaling_factor = 1.0 / (2 * population_size)
 for node in tree.preorder():
     if node.length is not None:
         node.length *= scaling_factor
 
-print(tree.get_newick(with_distances=True, semicolon=True)) # Prints the rescaled simulated tree
+# Print the rescaled simulated tree
+print(tree.get_newick(with_distances=True, semicolon=True))
 
-# Simulates alignment from the rescaled simulated tree using AliSim
+# Simulate alignment from the rescaled simulated tree using AliSim
 trees = [tree]
-res = simulate_alignment(
+aln, log = simulate_alignment(
         trees = trees,
-        subst_model = "JC",
-        seed = seed,
+        model = "JC",
+        rand_seed = seed,
         num_threads = num_threads,
-        seq_length = seq_length)
+        length = seq_length)
 
-print(res[0]) # Prints the alignment
-print(res[1]) # Prints logs
+# Print the alignment
+print(aln)
+
+# Print the console log
+print(log)
 
 ```
 
@@ -68,7 +71,7 @@ import msprime
 from piqtree import simulate_alignment
 import cogent3
 
-# Sets simulation parameters
+# Set simulation parameters
 seq_length = 2000
 recombination_rate = 1e-8
 population_size = 100_000 # larger population sizes create conditions with more gene tree discordance
@@ -98,7 +101,7 @@ demog = msprime.Demography.from_species_tree(
 
 gene_trees, rescaled_trees = [], []
 
-# Simulates gene trees given the demography under the coalescent model
+# Simulate gene trees given the demography under the coalescent model
 for i in range(num_genes):
     ts = msprime.sim_ancestry(
         samples=samples,
@@ -123,7 +126,7 @@ for i, t in enumerate(gene_trees):
     rescaled_trees.append(tree)
     print(tree.get_newick(with_distances=True, semicolon=True) + '\n') # Prints the rescaled simulated tree
 
-# creates partition file
+# Create a partition file
 partition_info = '#nexus\n begin sets;\n\t'
 for i in range(len(rescaled_trees)):
     partition_info += 'charset gene_'+str(i+1)+' = DNA, '+ str(seq_length*i+1) + '-' + str(seq_length*i+seq_length) +';\n\t'
@@ -134,8 +137,8 @@ partition_info += 'JC:gene_'+str(len(rescaled_trees))+';\n'
 partition_info += 'end;'
 print(partition_info)
 
-# Simulates alignment from the rescaled simulated tree using AliSim
-res = simulate_alignment(
+# Simulate an alignment from the rescaled simulated tree using AliSim
+aln, log = simulate_alignment(
         trees = rescaled_trees,
         partition_info=partition_info,
         partition_type="unlinked",
@@ -144,36 +147,38 @@ res = simulate_alignment(
         num_threads = num_threads,
         length = seq_length)
 
-print(res[0]) # Prints the alignment
-print(res[1]) # Prints logs
+# Print the alignment
+print(aln)
+
+# Print the console logs
+print(log)
 
 ```
 
 ### Description of Parameters for Tree Simulation
-
-The `sim_ancestry` function in `msprime` can simulate trees under different population genetics models, including the coalescent model with recombination. We explain the parameters used above as well as other useful parameters:
-- `samples`: int | dict. Represents the number of sampled individuals in a population.
+- `samples`: int | dict. The number of sampled individuals in a population.
 - `recombination_rate`: float | None. Uniform and non-uniform rates of recombination along the genome.
-- `population_size`: int | None. Sets the size of the single constant sized population.
-- `ploidy`: int | None. Sets the number of nodes per sample individual, as well as the time scale for continuous time coalescent models. The default value of ploidy is 2, assuming diploid populations.
-- `sequence_length`: int | None. Determines the total length of the sequence.
-- `model`: str | None. Determines the model under which the ancestral history of the sample is generated. The default model is standard coalescent, but other models such as [Discrete Time Wright-Fisher].(https://tskit.dev/msprime/docs/stable/api.html#msprime.DiscreteTimeWrightFisher) are supported.
+- `population_size`: int | None. The size of the single constant sized population.
+- `ploidy`: int | None. The number of nodes per sample individual, as well as the time scale for continuous time coalescent models. Default: 2, assuming diploid populations.
+- `sequence_length`: int | None. The total length of the sequence.
+- `model`: str | None. The model under which the ancestral history of the sample is generated. Default: standard coalescent. For other models, please refer to [Discrete Time Wright-Fisher](https://tskit.dev/msprime/docs/stable/api.html#msprime.DiscreteTimeWrightFisher).
 - `num_replicates`: int | None. Number of independent simulation replicates (e.g., gene trees).
 
-For further information about the usage of these parameters, see https://tskit.dev/msprime/docs/stable/ancestry.html.
+For further information about the usage of these parameters, see [msprime documentation](https://tskit.dev/msprime/docs/stable/ancestry.html).
 
 ### Description of Parameters for Alignment Simulation
 
-In addition to the input set of trees, `simulate_alignment` allows for specifying several parameters:
-- `subst_model`: str | None. Sequence substitution model.
-- `num_threads`: int | None. Number of threads (by default None and will be set to 1).
-- `partition_info`: list[str] | None. Partition information (by default None and will be set to []).
-- `partition_type`: str | None. If provided, partition type must be ‘equal’, ‘proportion’, or ‘unlinked’ (by default None and will be set to "").
-- `seq_length`: int | None. The length of sequences (by default None and will be set to 1000).
-- `insertion_rate`: float | None. The insertion rate (by default None and will be set to 0.0).
-- `deletion_rate`: float | None. The deletion rate (by default None and will be set to 0.0).
-- `root_seq`: str | None. The root sequence (by default None and will be set to "").
-- `insertion_size_distribution`: str | None. The insertion size distribution (by default None and will be set to "").
-- `deletion_size_distribution`: str | None. The deletion size distribution (by default None and will be set to "").
+- `trees`: list[cogent3.PhyloNode]. A list of cogent3 trees.
+- `model`: str. The substitution model. AliSim supports [all models](https://iqtree.github.io/doc/Substitution-Models) available in IQ-TREE. Please refer to [AliSim's User Manual](https://iqtree.github.io/doc/AliSim#specifying-model-parameters) for specifying other substitution models and their parameters.
+- `rand_seed`: int. The random seed number.
+- `length`: int. The length of sequences. Default: 1000 sites.
+- `insertion_rate`: float. The insertion rate. Default: 0.
+- `deletion_rate`: float. The deletion rate. Default: 0.
+- `insertion_size_distribution`: str. The insertion size distribution. Default: "POW{1.7/100}" (a power-law (Zipfian) distribution with parameter a of 1.7 and maximum indel size of 100).
+- `deletion_size_distribution`: str. The deletion size distribution. Default: "POW{1.7/100}".
+- `root_seq`: str. The root sequence. Default: "".
+- `partition_info`: partition_info: str. The content of the partition file. Default: "".
+- `partition_type`: str | None. The type of partitions,  must be ‘equal’, ‘proportion’, ‘unlinked’, or None. Default: None.
+- `num_threads`: int. The number of threads. Default: 1.
 
-For how to specify a `Model`, see ["Use different kinds of substitution models"](using_substitution_models.md).
+

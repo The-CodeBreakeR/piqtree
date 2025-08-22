@@ -38,6 +38,6 @@ Apart from the simple JC model with no parameters, AliSim also supports all othe
 - `insertion_size_distribution`: str. The insertion size distribution. Default: "POW{1.7/100}" (a power-law (Zipfian) distribution with parameter a of 1.7 and maximum indel size of 100).
 - `deletion_size_distribution`: str. The deletion size distribution. Default: "POW{1.7/100}".
 - `root_seq`: str. The root sequence. Default: "".
-- `partition_info`: partition_info: list[str]. The content of the partition file. Default: [].
+- `partition_info`: partition_info: str. The content of the partition file. Default: "".
 - `partition_type`: str | None. The type of partitions,  must be ‘equal’, ‘proportion’, ‘unlinked’, or None. Default: None.
 - `num_threads`: int. The number of threads. Default: 1.
