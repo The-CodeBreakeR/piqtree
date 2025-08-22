@@ -26,7 +26,7 @@ def simulate_alignment(
     insertion_size_distribution: IndelDistribution | str = "POW{1.7/100}",
     deletion_size_distribution: IndelDistribution | str = "POW{1.7/100}",
     root_seq: str | None = None,
-    partition_info: list[str] | None = None,
+    partition_info: str | None = None,
     partition_type: Literal["equal", "proportion", "unlinked"] | None = None,
     num_threads: int | None = None,
 ) -> tuple[c3_types.AlignedSeqsType, str]:
@@ -54,7 +54,7 @@ def simulate_alignment(
         distribution with a=1.7 and maximum size 100).
     root_seq: str | None, optional
         The root sequence (by default None).
-    partition_info: list[str] | None, optional
+    partition_info: str | None, optional
         Partition information (by default None).
     partition_type: Literal["equal", "proportion", "unlinked"] | None, optional
         If provided, partition type must be "equal", "proportion", or
@@ -76,7 +76,7 @@ def simulate_alignment(
         root_seq = ""
 
     if partition_info is None:
-        partition_info = []
+        partition_info = ""
     if partition_type is None:
         partition_type = ""
 
@@ -113,7 +113,7 @@ def simulate_alignment(
         tmp.flush()
         aln = cogent3.load_aligned_seqs(
             tmp.name,
-            format="phylip",
+            format="fasta",
             new_type=True,
         )  # moltype = 'dna' or 'protein')
     Path(tmp.name).unlink()

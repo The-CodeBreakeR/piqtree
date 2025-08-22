@@ -157,7 +157,7 @@ extern "C" StringResult version();
 extern "C" StringResult simulate_alignment(StringArray& trees,
                                            const char* subst_model,
                                            int seed,
-                                           StringArray& partition_info,
+                                           const char* partition_info = "",
                                            const char* partition_type = "",
                                            int seq_length = 1000,
                                            double insertion_rate = 0,
