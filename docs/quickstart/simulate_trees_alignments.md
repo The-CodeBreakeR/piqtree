@@ -103,9 +103,7 @@ for i in range(num_genes):
     ts = msprime.sim_ancestry(
         samples=samples,
         demography=demog,
-        model=msprime.StandardCoalescent(),
         sequence_length=seq_length,
-        recombination_rate=recombination_rate,
         random_seed=seed+i)
     for t in ts.trees():
         gene_trees.append(t)
