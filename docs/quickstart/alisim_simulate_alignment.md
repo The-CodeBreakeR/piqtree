@@ -1,57 +1,43 @@
 # Execute AliSim simulation and output the alignment
 
-An alignment can be simulated using `simulate_alignment`, given a list of trees and a model
+One can use `simulate_alignment()` to simulate a multiple sequence alignment, given a list of trees, a model name and a random seed number.
 
 ## Usage
 
 ### Basic Usage
 
-Construct `cogent3` tree(s), choose the model and random seed, then simulate an alignment using AliSim.
+This example simulates an alignment from a tree under the Juke-Cantor (JC) model and a random seed number of 1. 
 
 ```python
 from piqtree import simulate_alignment
 import cogent3
 
+# Create a cogent3 tree from a Newick string
 tree = cogent3.make_tree("((A:0.1,B:0.2):0.1,(C:0.3,D:0.4):0.2,E:0.5);")
 trees = [tree]
 
-res = simulate_alignment(trees, "JC", 1)
+# Simulate an alignment from the tree(s) under the JC model and a random seed number = 1
+aln, log = simulate_alignment(trees, "JC", 1)
 
-print(res[0]) # Prints the alignment
-print(res[1]) # Prints logs
+# Prints the alignment
+print(aln)
+
+# Prints the console logs
+print(log)
 ```
 
-### Multithreading
-
-To speed up computation, the number of threads to be used may be specified.
-By default, the computation is done on a single thread. If 0 is specified,
-then IQ-TREE attempts to determine the optimal number of threads.
-
-```python
-from piqtree import simulate_alignment
-import cogent3
-
-tree = cogent3.make_tree("((A:0.1,B:0.2):0.1,(C:0.3,D:0.4):0.2,E:0.5);")
-trees = [tree]
-
-res = simulate_alignment(trees, "JC", 1, num_threads = 4)
-
-print(res[0]) # Prints the alignment
-print(res[1]) # Prints logs
-```
+Apart from the simple JC model with no parameters, AliSim also supports all other [more complex models](https://iqtree.github.io/doc/Substitution-Models) available in IQ-TREE. Please refer to [AliSim's User Manual](https://iqtree.github.io/doc/AliSim#specifying-model-parameters) for specifying other substitution models and their parameters.
 
 ### Other (Optional) Input Parameters
 
-Apart from the parameters above, `simulate_alignment` also allows specifying several other parameters described below:
-- `partition_info`: partition_info: list[str] | None. Partition information (by default None and will be set to []).
-- `partition_type`: str | None. If provided, partition type must be ‘equal’, ‘proportion’, or ‘unlinked’ (by default None and will be set to "").
-- `seq_length`: int | None. The length of sequences (by default None and will be set to 1000).
-- `insertion_rate`: float | None. The insertion rate (by default None and will be set to 0.0).
-- `deletion_rate`: float | None. The deletion rate (by default None and will be set to 0.0).
-- `root_seq`: str | None. The root sequence (by default None and will be set to "").
-- `insertion_size_distribution`: str | None. The insertion size distribution (by default None and will be set to "").
-- `deletion_size_distribution`: str | None. The deletion size distribution (by default None and will be set to "").
+`simulate_alignment()` also allows specifying the following (optional) parameters.
 
-## See also
-
-- For how to specify a `Model`, see ["Use different kinds of substitution models"](using_substitution_models.md).
+- `length`: int. The length of sequences. Default: 1000 sites.
+- `insertion_rate`: float. The insertion rate. Default: 0.
+- `deletion_rate`: float. The deletion rate. Default: 0.
+- `insertion_size_distribution`: str. The insertion size distribution. Default: "POW{1.7/100}" (a power-law (Zipfian) distribution with parameter a of 1.7 and maximum indel size of 100).
+- `deletion_size_distribution`: str. The deletion size distribution. Default: "POW{1.7/100}".
+- `root_seq`: str. The root sequence. Default: "".
+- `partition_info`: partition_info: list[str]. The content of the partition file. Default: [].
+- `partition_type`: str | None. The type of partitions,  must be ‘equal’, ‘proportion’, ‘unlinked’, or None. Default: None.
+- `num_threads`: int. The number of threads. Default: 1.
