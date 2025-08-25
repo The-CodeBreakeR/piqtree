@@ -141,7 +141,7 @@ extern "C" StringResult version();
 /*
  * Execute AliSim Simulation
  * output: results in YAML format that contains the simulated alignment and the content of the log file
- * trees -- array of NEWICK tree strings (multiple trees)
+ * tree -- the NEWICK tree string
  * subst_model -- the substitution model name
  * seed -- the random seed
  * partition_info -- partition information
@@ -155,7 +155,7 @@ extern "C" StringResult version();
  * deletion_size_distribution -- the deletion size distribution
  * population_size -- the population size
  */
-extern "C" StringResult simulate_alignment(StringArray& trees,
+extern "C" StringResult simulate_alignment(const char* tree,
                                            const char* subst_model,
                                            int seed,
                                            const char* partition_info = "",

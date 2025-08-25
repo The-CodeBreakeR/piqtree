@@ -18,7 +18,7 @@ iq_simulate_alignment = iqtree_func(iq_simulate_alignment, hide_files=True)
 
 
 def simulate_alignment(
-        trees: list[cogent3.PhyloNode],
+        tree: cogent3.PhyloNode | list[cogent3.PhyloNode],
         model: Model | str | list[Model] | list[str],
         rand_seed: int,
         length: int | list[int] = 1000,
@@ -35,14 +35,14 @@ def simulate_alignment(
 
     Parameters
     ----------
-    trees: list[cogent3.PhyloNode]
-        A list of trees.
+    tree: cogent3.PhyloNode | list[cogent3.PhyloNode]
+        A tree. If a list of trees is provided, it will serve as partition trees.
     subst_model: Model | str | list[Model] | list[str]
-        A substitution model. If a list of substitution models is provided, they will serve as partition models.
+        A substitution model. If a list of substitution models is provided, it will serve as partition models.
     rand_seed : int
         The random seed number.
     length: int | list[int], optional
-        The length of sequences (by default 1000). If a list of lengths is provided, they will serve as partition lengths.
+        The length of sequences (by default 1000). If a list of lengths is provided, it will serve as partition lengths.
     insertion_rate: float | None, optional
         The insertion rate (by default 0.0).
     deletion_rate: float | None, optional
@@ -84,13 +84,15 @@ def simulate_alignment(
         population_size = -1
 
     # convert model and length into lists
+    if not isinstance(tree, list):
+        tree = [tree]
     if not isinstance(model, list):
         model = [model]
     if not isinstance(length, list):
         length = [length]
 
     # check if using partition model, extract the number of partitions
-    num_partitions = max(len(trees), len(model), len(length))
+    num_partitions = max(len(tree), len(model), len(length))
     use_partitions = (partition_type is not None and len(partition_type) > 0) or num_partitions > 1
 
     # if using partitions, partition_type must be specified
@@ -106,8 +108,15 @@ def simulate_alignment(
     # if using partitions, num_partitions must be > 1
     if use_partitions and num_partitions <= 1:
         raise ParseIqTreeError(
-            "To use partition models, the number of partitions (i.e., max(len(trees), len(model), len(length)) = " + str(
+            "To use partition models, the number of partitions (i.e., max(len(tree), len(model), len(length)) = " + str(
                 num_partitions) + ") must be greater than 1.")
+
+    # the number of trees must be either 1 or match the number of partitions
+    if use_partitions and len(tree) != num_partitions and len(tree) != 1:
+        raise ParseIqTreeError(
+            "The number of trees (" + str(
+                len(tree)) + ") must be either 1 or match the number of partitions (i.e., max(len(tree), len(model), len(length)) = " + str(
+                num_partitions) + ").")
 
     # the number of models must be either 1 or match the number of partitions
     if use_partitions and len(model) != num_partitions:
@@ -118,7 +127,7 @@ def simulate_alignment(
         else:
             raise ParseIqTreeError(
                 "The number of models (" + str(
-                    len(model)) + ") must be either 1 or match the number of partitions (i.e., max(len(trees), len(model), len(length)) = " + str(
+                    len(model)) + ") must be either 1 or match the number of partitions (i.e., max(len(tree), len(model), len(length)) = " + str(
                     num_partitions) + ").")
 
     # the number of lengths must be either 1 or match the number of partitions
@@ -130,7 +139,7 @@ def simulate_alignment(
         else:
             raise ParseIqTreeError(
                 "The number of lengths (" + str(
-                    len(length)) + ") must be either 1 or match the number of partitions (i.e., max(len(trees), len(model), len(length)) = " + str(
+                    len(length)) + ") must be either 1 or match the number of partitions (i.e., max(len(tree), len(model), len(length)) = " + str(
                     num_partitions) + ").")
 
     # convert model to string if needed
@@ -138,7 +147,7 @@ def simulate_alignment(
         model[i] = str(model[i]) if isinstance(model[i], Model) else model[i]
 
     # Convert the trees to Newick strings
-    newick_trees = [str(tree) for tree in trees]
+    newick_trees = "\n".join([str(single_tree) for single_tree in tree])
 
     # init parameters for AliSim API
     common_model = model[0]

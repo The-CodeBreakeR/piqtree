@@ -14,16 +14,16 @@ import cogent3
 
 # Create a cogent3 tree from a Newick string
 tree = cogent3.make_tree("((A:0.1,B:0.2):0.1,(C:0.3,D:0.4):0.2,E:0.5);")
-trees = [tree]
 
-# Simulate an alignment from the tree(s) under the JC model and a random seed number = 1
-aln, log = simulate_alignment(trees, "JC", 1)
+# Simulate an alignment from the tree under the JC model and a random seed number = 1
+aln, log = simulate_alignment(tree, "JC", 1)
 
 # Prints the alignment
 print(aln)
 
 # Prints the console logs
-print(log)
+print(log) 
+
 ```
 
 Apart from the simple JC model with no parameters, AliSim also supports all other [more complex models](https://iqtree.github.io/doc/Substitution-Models) available in IQ-TREE. Please refer to [AliSim's User Manual](https://iqtree.github.io/doc/AliSim#specifying-model-parameters) for specifying other substitution models and their parameters.

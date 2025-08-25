@@ -36,7 +36,7 @@ tree = cogent3.make_tree(newick_tree)
 
 # Simulate alignment from the simulated tree using AliSim
 aln, log = simulate_alignment(
-        trees = [tree],
+        tree = tree,
         model = "HKY{2}+F{0.2/0.3/0.1/0.4}",
         rand_seed = seed,
         length = seq_length,
@@ -104,7 +104,7 @@ for i in range(num_genes):
 
 # Simulate an alignment from the simulated trees using AliSim
 aln, log = simulate_alignment(
-    trees=gene_trees,
+    tree=gene_trees,
     # Specify a list of models, each model will be applied to one partition (gene tree)
     model=['JC', 'HKY{2}+F{0.2/0.3/0.4/0.1}', 'GTR{2/3/4/5/6}+F{0.1/0.3/0.2/0.4}'],
     rand_seed=seed,
@@ -135,7 +135,7 @@ For further information about the usage of these parameters, see [msprime docume
 
 ### Description of Parameters for Alignment Simulation
 
-- `trees`: list[cogent3.PhyloNode]. A list of cogent3 trees.
+- `tree`: cogent3.PhyloNode | list[cogent3.PhyloNode]. A cogent3 tree. If a list of trees is provided, it will serve as partition trees.
 - `model`: Model | str | list[Model] | list[str]. The substitution model. AliSim supports [all models](https://iqtree.github.io/doc/Substitution-Models) available in IQ-TREE. Please refer to [AliSim's User Manual](https://iqtree.github.io/doc/AliSim#specifying-model-parameters) for specifying other substitution models and their parameters. For partitions, if a list of models is provided, each model will be applied to the corresponding partition. If a single model is provided, it will be applied to all partitions. 
 - `rand_seed`: int. The random seed number.
 - `length`: int | list[int]. The length of sequences. Default: 1000 sites. For partitions, if a list of lengths is provided, each length will be applied to the corresponding partition. If a single length is provided, all partitions will have the same length. 
