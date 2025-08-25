@@ -29,6 +29,7 @@ def simulate_alignment(
     partition_info: str | None = None,
     partition_type: Literal["equal", "proportion", "unlinked"] | None = None,
     num_threads: int | None = None,
+    population_size: int | None = None,
 ) -> tuple[c3_types.AlignedSeqsType, str]:
     """Executes AliSim Simulation through IQ-TREE.
 
@@ -61,6 +62,8 @@ def simulate_alignment(
         "unlinked" (by default None).
     num_threads: int | None, optional
         Number of threads for IQ-TREE to use, by default None (single-threaded).
+    population_size: int | None, optional
+        The population size (by default None).
 
     Returns
     -------
@@ -83,6 +86,9 @@ def simulate_alignment(
     if num_threads is None:
         num_threads = 1
 
+    if population_size is None:
+        population_size = -1
+
     model_str = str(model) if isinstance(model, Model) else model
 
     # Convert the trees to Newick strings
@@ -103,6 +109,7 @@ def simulate_alignment(
             num_threads,
             str(insertion_size_distribution),
             str(deletion_size_distribution),
+            population_size,
         ),
     )
 
