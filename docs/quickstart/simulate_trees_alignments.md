@@ -6,7 +6,7 @@ A set of coalescent trees can be simulated using `sim_ancestry()` from the [mspr
 
 ### Example for Single Population
 
-The following pipeline simulates a set of trees independently under the coalescent model with a given population size and recombination rate using `msprime`, then rescales the branch lengths of the trees to substitution units, and finally simulates an alignment for the rescaled trees using the `piqtree`'s version of `AliSim` with a given substitution model and random seed.
+The following pipeline simulates a set of trees independently under the coalescent model with a given population size and recombination rate using `msprime`, then simulates an alignment for the first tree using the `piqtree`'s version of `AliSim` with a given substitution model and random seed.
 
 ```python
 from piqtree import simulate_alignment
@@ -18,7 +18,6 @@ num_taxa = 10
 seq_length = 2000
 recombination_rate = 1e-8
 population_size = 10000
-num_threads = 5
 seed = 1
 
 # Simulate trees under the coalescent model using msprime
@@ -35,12 +34,11 @@ for t in ts.trees():
     break
 tree = cogent3.make_tree(newick_tree)
 
-# Simulate alignment from the rescaled simulated tree using AliSim
+# Simulate alignment from the simulated tree using AliSim
 aln, log = simulate_alignment(
         trees = [tree],
-        model = "JC",
+        model = "HKY{2}+F{0.2/0.3/0.1/0.4}",
         rand_seed = seed,
-        num_threads = num_threads,
         length = seq_length,
         population_size = population_size)
 
@@ -54,7 +52,7 @@ print(log)
 
 ### Example for Multiple Populations/Species
 
-The following pipeline extends the previous example by simulating a set of gene trees generated under the multi-species coalescent model given a species tree with four species `human`, `chimp`, `gorilla` and `orangutan`. 
+The following pipeline extends the previous example by simulating a set of gene trees generated under the multi-species coalescent model given a species tree with four species `human`, `chimp`, `gorilla` and `orangutan`. We then employ [partition model](https://iqtree.github.io/doc/AliSim#partition-models) to simulate an alignment from a set of gene trees.
 
 
 ```python
@@ -65,22 +63,21 @@ import cogent3
 # Set simulation parameters
 seq_length = 2000
 recombination_rate = 1e-8
-population_size = 100_000 # larger population sizes create conditions with more gene tree discordance
+population_size = 100_000  # larger population sizes create conditions with more gene tree discordance
 generation_time = 20
-num_threads = 5
 seed = 1
-num_genes = 10
+num_genes = 3
 
 species_list = ["human", "chimp", "gorilla", "orangutan"]
-num_ind_per_species = [1, 2, 1, 3] # sets varying number of individuals per species
+num_ind_per_species = [1, 2, 1, 3]  # sets varying number of individuals per species
 species_tree = "(((human:5.6,chimp:5.6):3.0,gorilla:8.6):9.4,orangutan:18.0)"
 
 samples, sample_labels, sample_index = [], {}, 0
 for i in range(len(species_list)):
     samples.append(msprime.SampleSet(num_ind_per_species[i], population=species_list[i], time=0))
 for i in range(len(species_list)):
-    for j in range(2*num_ind_per_species[i]):  # 2 samples per species
-        sample_labels[sample_index] = f"{species_list[i]}_{j+1}"
+    for j in range(2 * num_ind_per_species[i]):  # 2 samples per species
+        sample_labels[sample_index] = f"{species_list[i]}_{j + 1}"
         sample_index += 1
 
 # Create demography from species tree
@@ -98,34 +95,24 @@ for i in range(num_genes):
         samples=samples,
         demography=demog,
         sequence_length=seq_length,
-        random_seed=seed+i)
+        random_seed=seed + i)
     for t in ts.trees():
         newick = t.as_newick(node_labels=sample_labels)
         gene_trees.append(cogent3.make_tree(newick))
         print(f"Tree {i}:\n{newick}\n")
         break
 
-# Create a partition file
-partition_info = '#nexus\n begin sets;\n\t'
-for i in range(len(gene_trees)):
-    partition_info += 'charset gene_'+str(i+1)+' = DNA, '+ str(seq_length*i+1) + '-' + str(seq_length*i+seq_length) +';\n\t'
-partition_info += 'charpartition mine = '
-for i in range(len(gene_trees)-1):
-    partition_info += 'JC:gene_'+str(i+1)+',\n\t'
-partition_info += 'JC:gene_'+str(len(gene_trees))+';\n'
-partition_info += 'end;'
-print(partition_info)
-
-# Simulate an alignment from the rescaled simulated tree using AliSim
+# Simulate an alignment from the simulated trees using AliSim
 aln, log = simulate_alignment(
-        trees = gene_trees,
-        partition_info=partition_info,
-        partition_type="unlinked",
-        rand_seed = seed,
-        model='JC',
-        num_threads = num_threads,
-        length = seq_length,
-        population_size = population_size)
+    trees=gene_trees,
+    # Specify a list of models, each model will be applied to one partition (gene tree)
+    model=['JC', 'HKY{2}+F{0.2/0.3/0.4/0.1}', 'GTR{2/3/4/5/6}+F{0.1/0.3/0.2/0.4}'],
+    rand_seed=seed,
+    # Each partition will have the same length of `seq_length`. One can provide a list of lengths (e.g., [1000, 1500, 2000]) to specify partition-specific lengths.
+    length=seq_length,
+    # We must specify Edge-unlinked partitions here since we use multiple gene trees.
+    partition_type="unlinked",
+    population_size=population_size)
 
 # Print the alignment
 print(aln)
@@ -149,16 +136,15 @@ For further information about the usage of these parameters, see [msprime docume
 ### Description of Parameters for Alignment Simulation
 
 - `trees`: list[cogent3.PhyloNode]. A list of cogent3 trees.
-- `model`: Model | str. The substitution model. AliSim supports [all models](https://iqtree.github.io/doc/Substitution-Models) available in IQ-TREE. Please refer to [AliSim's User Manual](https://iqtree.github.io/doc/AliSim#specifying-model-parameters) for specifying other substitution models and their parameters.
+- `model`: Model | str | list[Model] | list[str]. The substitution model. AliSim supports [all models](https://iqtree.github.io/doc/Substitution-Models) available in IQ-TREE. Please refer to [AliSim's User Manual](https://iqtree.github.io/doc/AliSim#specifying-model-parameters) for specifying other substitution models and their parameters. For partitions, if a list of models is provided, each model will be applied to the corresponding partition. If a single model is provided, it will be applied to all partitions. 
 - `rand_seed`: int. The random seed number.
-- `length`: int. The length of sequences. Default: 1000 sites.
+- `length`: int | list[int]. The length of sequences. Default: 1000 sites. For partitions, if a list of lengths is provided, each length will be applied to the corresponding partition. If a single length is provided, all partitions will have the same length. 
 - `insertion_rate`: float. The insertion rate. Default: 0.
 - `deletion_rate`: float. The deletion rate. Default: 0.
 - `insertion_size_distribution`: str. The insertion size distribution. Default: "POW{1.7/100}" (a power-law (Zipfian) distribution with parameter a of 1.7 and maximum indel size of 100).
 - `deletion_size_distribution`: str. The deletion size distribution. Default: "POW{1.7/100}".
 - `root_seq`: str. The root sequence. Default: "".
-- `partition_info`: partition_info: str. The content of the partition file. Default: "".
-- `partition_type`: str | None. The type of partitions,  must be ‘equal’, ‘proportion’, ‘unlinked’, or None. Default: None.
+- `partition_type`: str | None. Default: None. If specified, partition_type must be ‘equal’, ‘proportion’, ‘unlinked’, representing Edge-equal, Edge-proportional, and Topology-unlinked [partition models](https://iqtree.github.io/doc/AliSim#partition-models), respectively.  
 - `num_threads`: int. The number of threads. Default: 1.
 
 

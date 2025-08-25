@@ -32,12 +32,11 @@ Apart from the simple JC model with no parameters, AliSim also supports all othe
 
 `simulate_alignment()` also allows specifying the following (optional) parameters.
 
-- `length`: int. The length of sequences. Default: 1000 sites.
+- `length`: int | list[int]. The length of sequences. Default: 1000 sites. For partitions, if a list of lengths is provided, each length will be applied to the corresponding partition. If a single length is provided, all partitions will have the same length. 
 - `insertion_rate`: float. The insertion rate. Default: 0.
 - `deletion_rate`: float. The deletion rate. Default: 0.
 - `insertion_size_distribution`: str. The insertion size distribution. Default: "POW{1.7/100}" (a power-law (Zipfian) distribution with parameter a of 1.7 and maximum indel size of 100).
 - `deletion_size_distribution`: str. The deletion size distribution. Default: "POW{1.7/100}".
 - `root_seq`: str. The root sequence. Default: "".
-- `partition_info`: partition_info: str. The content of the partition file. Default: "".
-- `partition_type`: str | None. The type of partitions,  must be ‘equal’, ‘proportion’, ‘unlinked’, or None. Default: None.
+- `partition_type`: str | None. Default: None. If specified, partition_type must be ‘equal’, ‘proportion’, ‘unlinked’, representing Edge-equal, Edge-proportional, and Topology-unlinked [partition models](https://iqtree.github.io/doc/AliSim#partition-models), respectively.  
 - `num_threads`: int. The number of threads. Default: 1.
