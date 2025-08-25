@@ -35,23 +35,14 @@ for t in ts.trees():
     break
 tree = cogent3.make_tree(newick_tree)
 
-# Rescale branch lengths to substitution units
-scaling_factor = 1.0 / (2 * population_size)
-for node in tree.preorder():
-    if node.length is not None:
-        node.length *= scaling_factor
-
-# Print the rescaled simulated tree
-print(tree.get_newick(with_distances=True, semicolon=True))
-
 # Simulate alignment from the rescaled simulated tree using AliSim
-trees = [tree]
 aln, log = simulate_alignment(
-        trees = trees,
+        trees = [tree],
         model = "JC",
         rand_seed = seed,
         num_threads = num_threads,
-        length = seq_length)
+        length = seq_length,
+        population_size = population_size)
 
 # Print the alignment
 print(aln)
@@ -99,7 +90,7 @@ demog = msprime.Demography.from_species_tree(
     generation_time=generation_time,
     initial_size=population_size)
 
-gene_trees, rescaled_trees = [], []
+gene_trees = []
 
 # Simulate gene trees given the demography under the coalescent model
 for i in range(num_genes):
@@ -109,43 +100,32 @@ for i in range(num_genes):
         sequence_length=seq_length,
         random_seed=seed+i)
     for t in ts.trees():
-        gene_trees.append(t)
+        newick = t.as_newick(node_labels=sample_labels)
+        gene_trees.append(cogent3.make_tree(newick))
+        print(f"Tree {i}:\n{newick}\n")
         break
-
-for i, t in enumerate(gene_trees):
-    newick = t.as_newick(node_labels=sample_labels)
-    tree = cogent3.make_tree(newick)
-    print(f"Tree {i}:\n{newick}\n")
-
-    # Rescales branch lengths to substitution units
-    scaling_factor = 1.0 / (2 * population_size)
-    for node in tree.preorder():
-        if node.length is not None:
-            node.length *= scaling_factor
-
-    rescaled_trees.append(tree)
-    print(tree.get_newick(with_distances=True, semicolon=True) + '\n') # Prints the rescaled simulated tree
 
 # Create a partition file
 partition_info = '#nexus\n begin sets;\n\t'
-for i in range(len(rescaled_trees)):
+for i in range(len(gene_trees)):
     partition_info += 'charset gene_'+str(i+1)+' = DNA, '+ str(seq_length*i+1) + '-' + str(seq_length*i+seq_length) +';\n\t'
 partition_info += 'charpartition mine = '
-for i in range(len(rescaled_trees)-1):
+for i in range(len(gene_trees)-1):
     partition_info += 'JC:gene_'+str(i+1)+',\n\t'
-partition_info += 'JC:gene_'+str(len(rescaled_trees))+';\n'
+partition_info += 'JC:gene_'+str(len(gene_trees))+';\n'
 partition_info += 'end;'
 print(partition_info)
 
 # Simulate an alignment from the rescaled simulated tree using AliSim
 aln, log = simulate_alignment(
-        trees = rescaled_trees,
+        trees = gene_trees,
         partition_info=partition_info,
         partition_type="unlinked",
         rand_seed = seed,
         model='JC',
         num_threads = num_threads,
-        length = seq_length)
+        length = seq_length,
+        population_size = population_size)
 
 # Print the alignment
 print(aln)
@@ -169,7 +149,7 @@ For further information about the usage of these parameters, see [msprime docume
 ### Description of Parameters for Alignment Simulation
 
 - `trees`: list[cogent3.PhyloNode]. A list of cogent3 trees.
-- `model`: str. The substitution model. AliSim supports [all models](https://iqtree.github.io/doc/Substitution-Models) available in IQ-TREE. Please refer to [AliSim's User Manual](https://iqtree.github.io/doc/AliSim#specifying-model-parameters) for specifying other substitution models and their parameters.
+- `model`: Model | str. The substitution model. AliSim supports [all models](https://iqtree.github.io/doc/Substitution-Models) available in IQ-TREE. Please refer to [AliSim's User Manual](https://iqtree.github.io/doc/AliSim#specifying-model-parameters) for specifying other substitution models and their parameters.
 - `rand_seed`: int. The random seed number.
 - `length`: int. The length of sequences. Default: 1000 sites.
 - `insertion_rate`: float. The insertion rate. Default: 0.
