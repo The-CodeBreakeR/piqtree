@@ -16,15 +16,12 @@ import msprime
 # Set simulation parameters
 num_taxa = 10
 seq_length = 2000
-recombination_rate = 1e-8
 population_size = 10000
 seed = 1
 
 # Simulate trees under the coalescent model using msprime
 ts = msprime.sim_ancestry(
         samples=num_taxa/2,
-        sequence_length=seq_length,
-        recombination_rate=recombination_rate,
         population_size=population_size,
         random_seed=seed)
 
@@ -62,7 +59,6 @@ import cogent3
 
 # Set simulation parameters
 seq_length = 2000
-recombination_rate = 1e-8
 population_size = 100_000  # larger population sizes create conditions with more gene tree discordance
 generation_time = 20
 seed = 1
@@ -94,7 +90,6 @@ for i in range(num_genes):
     ts = msprime.sim_ancestry(
         samples=samples,
         demography=demog,
-        sequence_length=seq_length,
         random_seed=seed + i)
     for t in ts.trees():
         newick = t.as_newick(node_labels=sample_labels)
