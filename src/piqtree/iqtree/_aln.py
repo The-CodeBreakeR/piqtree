@@ -17,6 +17,11 @@ from piqtree.model import Model
 iq_simulate_alignment = iqtree_func(iq_simulate_alignment, hide_files=True)
 
 
+# Helper functions
+def ensure_list(x):
+    return x if isinstance(x, list) else [x]
+
+# Main functions
 def simulate_alignment(
         tree: cogent3.PhyloNode | list[cogent3.PhyloNode],
         model: Model | str | list[Model] | list[str],
@@ -37,7 +42,7 @@ def simulate_alignment(
     ----------
     tree: cogent3.PhyloNode | list[cogent3.PhyloNode]
         A tree. If a list of trees is provided, it will serve as partition trees.
-    subst_model: Model | str | list[Model] | list[str]
+    model: Model | str | list[Model] | list[str]
         A substitution model. If a list of substitution models is provided, it will serve as partition models.
     rand_seed : int
         The random seed number.
@@ -47,10 +52,10 @@ def simulate_alignment(
         The insertion rate (by default 0.0).
     deletion_rate: float | None, optional
         The deletion rate (by default 0.0).
-    insertion_size_distribution: str | None, optional
+    insertion_size_distribution: IndelDistribution | str, optional
         The insertion size distribution (by default the Zipfian
         distribution with a=1.7 and maximum size 100).
-    deletion_size_distribution: str | None, optional
+    deletion_size_distribution: IndelDistribution | str, optional
         The deletion size distribution (by default the Zipfian
         distribution with a=1.7 and maximum size 100).
     root_seq: str | None, optional
@@ -71,6 +76,7 @@ def simulate_alignment(
         The console log
     """
 
+    # if not specified, set default values for variables
     if root_seq is None:
         root_seq = ""
 
@@ -82,14 +88,14 @@ def simulate_alignment(
 
     if population_size is None:
         population_size = -1
+    elif population_size <= 0:
+        raise ParseIqTreeError(
+            f"population_size must be positive, got {population_size}.")
 
-    # convert model and length into lists
-    if not isinstance(tree, list):
-        tree = [tree]
-    if not isinstance(model, list):
-        model = [model]
-    if not isinstance(length, list):
-        length = [length]
+    # convert tree, model, and length into lists
+    tree = ensure_list(tree)
+    model = ensure_list(model)
+    length = ensure_list(length)
 
     # check if using partition model, extract the number of partitions
     num_partitions = max(len(tree), len(model), len(length))
@@ -105,18 +111,22 @@ def simulate_alignment(
         raise ParseIqTreeError(
             "Sorry! the current API does not support edge-proportional partitions.")
 
+    # for edge-equal partition model, only one tree is required
+    if partition_type == "equal" and len(tree) > 1:
+        raise ParseIqTreeError(
+            "For Edge-equal partition model, only one tree is required.")
+
     # if using partitions, num_partitions must be > 1
     if use_partitions and num_partitions <= 1:
         raise ParseIqTreeError(
-            "To use partition models, the number of partitions (i.e., max(len(tree), len(model), len(length)) = " + str(
-                num_partitions) + ") must be greater than 1.")
+            f"""To use partition models, the number of partitions (i.e., max(len(tree), len(model), len(length)) = 
+            {num_partitions}) must be greater than 1.""".strip())
 
     # the number of trees must be either 1 or match the number of partitions
     if use_partitions and len(tree) != num_partitions and len(tree) != 1:
         raise ParseIqTreeError(
-            "The number of trees (" + str(
-                len(tree)) + ") must be either 1 or match the number of partitions (i.e., max(len(tree), len(model), len(length)) = " + str(
-                num_partitions) + ").")
+            f"""The number of trees ({len(tree)}) must be either 1 or match the number of partitions 
+            (i.e., max(len(tree), len(model), len(length)) = {num_partitions}).""".strip())
 
     # the number of models must be either 1 or match the number of partitions
     if use_partitions and len(model) != num_partitions:
@@ -126,9 +136,8 @@ def simulate_alignment(
         # otherwise, throw an error
         else:
             raise ParseIqTreeError(
-                "The number of models (" + str(
-                    len(model)) + ") must be either 1 or match the number of partitions (i.e., max(len(tree), len(model), len(length)) = " + str(
-                    num_partitions) + ").")
+                f"""The number of models ({len(model)}) must be either 1 or match the number of partitions 
+                (i.e., max(len(tree), len(model), len(length)) = {num_partitions}).""".strip())
 
     # the number of lengths must be either 1 or match the number of partitions
     if use_partitions and len(length) != num_partitions:
@@ -138,35 +147,32 @@ def simulate_alignment(
         # otherwise, throw an error
         else:
             raise ParseIqTreeError(
-                "The number of lengths (" + str(
-                    len(length)) + ") must be either 1 or match the number of partitions (i.e., max(len(tree), len(model), len(length)) = " + str(
-                    num_partitions) + ").")
+                f"""The number of lengths ({len(length)}) must be either 1 or match the number of partitions 
+                (i.e., max(len(tree), len(model), len(length)) = {num_partitions}).""".strip())
 
     # convert model to string if needed
-    for i in range(len(model)):
-        model[i] = str(model[i]) if isinstance(model[i], Model) else model[i]
+    model = [str(m) if isinstance(m, Model) else m for m in model]
 
     # Convert the trees to Newick strings
-    newick_trees = "\n".join([str(single_tree) for single_tree in tree])
+    newick_trees = "\n".join(str(t) for t in tree)
 
     # init parameters for AliSim API
     common_model = model[0]
     common_length = length[0]
 
     # generate a partition file if needed
-    partition_info = ""
     if use_partitions:
-        partition_info = '#nexus\n begin sets;\n\t'
+        parts = ["#nexus\n begin sets;\n\t"]
         start_site = 0
-        for i in range(num_partitions):
-            partition_info += 'charset gene_' + str(i + 1) + ' = ' + str(start_site + 1) + '-' + str(
-                start_site + length[i]) + ';\n\t'
-            start_site += length[i]
-        partition_info += 'charpartition mine = '
-        for i in range(num_partitions - 1):
-            partition_info += model[i] + ':gene_' + str(i + 1) + ',\n\t'
-        partition_info += model[-1] + ':gene_' + str(num_partitions) + ';\n'
-        partition_info += 'end;'
+        for i, l in enumerate(length, start=1):
+            parts.append(f"charset gene_{i} = {start_site + 1}-{start_site + l};\n\t")
+            start_site += l
+        parts.append("charpartition mine = ")
+        parts.extend([f"{model[i]}:gene_{i + 1},\n\t" for i in range(num_partitions - 1)])
+        parts.append(f"{model[-1]}:gene_{num_partitions};\nend;")
+        partition_info = "".join(parts)
+    else:
+        partition_info = ""
 
     # Call the IQ-TREE function
     yaml_result = yaml.safe_load(
