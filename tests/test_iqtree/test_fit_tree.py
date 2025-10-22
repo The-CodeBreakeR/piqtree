@@ -124,6 +124,45 @@ def test_fit_tree_str_model(
     check_branch_lengths(got, expected.tree)
 
 
+def test_fit_tree_fixed_branch_length(
+    three_otu: Alignment,
+) -> None:
+    tree_topology: PhyloNode = make_tree(tip_names=three_otu.names)
+    lengths = (0.1, 0.2, 0.3)
+    for i, node in enumerate(tree_topology.postorder(include_self=False)):
+        node.length = lengths[i]
+
+    with_fixed = piqtree.fit_tree(
+        three_otu,
+        tree_topology,
+        "GTR",
+        bl_fixed=True,
+    )
+    without_fixed = piqtree.fit_tree(
+        three_otu,
+        tree_topology,
+        "GTR",
+        bl_fixed=False,
+    )
+
+    assert "lnL" in with_fixed.params
+    assert "lnL" in without_fixed.params
+
+    assert with_fixed.params["lnL"] != pytest.approx(without_fixed.params["lnL"])
+
+    for fixed_node, not_fixed_node, original_node in zip(
+        with_fixed.postorder(include_self=False),
+        without_fixed.postorder(include_self=False),
+        tree_topology.postorder(include_self=False),
+        strict=True,
+    ):
+        assert fixed_node.name == not_fixed_node.name
+        assert not_fixed_node.name == original_node.name
+
+        assert fixed_node.length == original_node.length
+        assert not_fixed_node.length != original_node.length
+
+
 @pytest.mark.parametrize(
     "model_str",
     [
@@ -140,3 +179,21 @@ def test_fit_tree_paramaterisation(three_otu: Alignment, model_str: str) -> None
     assert isinstance(tree.params["lnL"], float)
     for node in tree.preorder(include_self=False):
         assert node.length > 0
+
+
+def test_special_characters(three_otu: Alignment) -> None:
+    def _renamer(before: str) -> str:
+        if before == three_otu.names[0]:
+            return r"_F''<.'_l_?|\y}_F_o_!@#$%^&*x_''"
+        return before
+
+    three_otu = three_otu.rename_seqs(_renamer)
+
+    to_fit = make_tree(r"(_F''<.'_l_?|\y}_F_o_!@#$%^&*x_'', (Rhesus, Mouse))")
+    tree = piqtree.fit_tree(three_otu, to_fit, "GTR")
+
+    assert isinstance(tree.params["lnL"], float)
+    for node in tree.preorder(include_self=False):
+        assert node.length > 0
+
+    assert set(three_otu.names) == set(tree.get_tip_names())

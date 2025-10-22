@@ -2,10 +2,12 @@
 
 from enum import Enum, auto
 
-import cogent3
 from _piqtree import iq_random_tree
+from cogent3 import make_tree
+from cogent3.core.tree import PhyloNode
 
 from piqtree.iqtree._decorator import iqtree_func
+from piqtree.util import process_rand_seed_nonzero
 
 iq_random_tree = iqtree_func(iq_random_tree)
 
@@ -25,7 +27,7 @@ def random_tree(
     num_taxa: int,
     tree_mode: TreeGenMode,
     rand_seed: int | None = None,
-) -> cogent3.PhyloNode:
+) -> PhyloNode:
     """Generate a random phylogenetic tree.
 
     Generates a random tree through IQ-TREE.
@@ -37,16 +39,15 @@ def random_tree(
     tree_mode : TreeGenMode
         How the tree is generated.
     rand_seed : int | None, optional
-        The random seed - 0 or None means no seed, by default None.
+        The random seed - None means no seed is used, by default None.
 
     Returns
     -------
-    cogent3.PhyloNode
+    PhyloNode
         A random phylogenetic tree.
 
     """
-    if rand_seed is None:
-        rand_seed = 0  # The default rand_seed in IQ-TREE
+    rand_seed = process_rand_seed_nonzero(rand_seed)
 
     newick = iq_random_tree(num_taxa, tree_mode.name, 1, rand_seed).strip()
-    return cogent3.make_tree(newick)
+    return make_tree(newick)

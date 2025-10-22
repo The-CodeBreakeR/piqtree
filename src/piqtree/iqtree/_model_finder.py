@@ -2,15 +2,16 @@
 
 import dataclasses
 from collections.abc import Iterable
-from typing import Any
+from typing import Any, cast
 
 import yaml
 from _piqtree import iq_model_finder
-from cogent3.app import typing as c3_types
+from cogent3.core.alignment import Alignment
 from cogent3.util.misc import get_object_provenance
 
 from piqtree.iqtree._decorator import iqtree_func
 from piqtree.model import Model, make_model
+from piqtree.util import process_rand_seed_nonzero
 
 iq_model_finder = iqtree_func(iq_model_finder, hide_files=True)
 
@@ -117,18 +118,18 @@ class ModelFinderResult:
 
 
 def model_finder(
-    aln: c3_types.AlignedSeqsType,
+    aln: Alignment,
     model_set: Iterable[str] | None = None,
     freq_set: Iterable[str] | None = None,
     rate_set: Iterable[str] | None = None,
     rand_seed: int | None = None,
     num_threads: int | None = None,
-) -> ModelFinderResult | c3_types.SerialisableType:
+) -> ModelFinderResult:
     """Find the models of best fit for an alignment using ModelFinder.
 
     Parameters
     ----------
-    aln : c3_types.AlignedSeqsType
+    aln : Alignment
         The alignment to find the model of best fit for.
     model_set : Iterable[str] | None, optional
         Search space for models.
@@ -140,20 +141,20 @@ def model_finder(
         Search space for rate heterogeneity types.
         Equivalent to IQ-TREE's mrate parameter, by default None
     rand_seed : int | None, optional
-        The random seed - 0 or None means no seed, by default None.
+        The random seed - None means no seed is used, by default None.
     num_threads: int | None, optional
         Number of threads for IQ-TREE to use, by default None (single-threaded).
         If 0 is specified, IQ-TREE attempts to find the optimal number of threads.
 
     Returns
     -------
-    ModelFinderResult | c3_types.SerialisableType
+    ModelFinderResult
         Collection of data returned from IQ-TREE's ModelFinder.
 
     """
-    source = aln.info.source
-    if rand_seed is None:
-        rand_seed = 0  # The default rand_seed in IQ-TREE
+    source = cast("str", aln.info.source)
+
+    rand_seed = process_rand_seed_nonzero(rand_seed)
 
     if num_threads is None:
         num_threads = 1
