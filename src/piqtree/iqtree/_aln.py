@@ -200,8 +200,7 @@ def simulate_alignment(
         tmp.flush()
         aln = cogent3.load_aligned_seqs(
             tmp.name,
-            format="fasta",
-            new_type=True,
+            format_name="fasta"
         )  # moltype = 'dna' or 'protein')
     Path(tmp.name).unlink()
     console_log = yaml_result["log"]
